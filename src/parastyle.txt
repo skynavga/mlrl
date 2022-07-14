@@ -1,0 +1,56 @@
+
+;
+; Paragraph Style Parameters
+;
+
+start-indentation	;start of line indent whole paragraph
+end-indentation		;end of line indent whole paragraph
+first-indentation	;first line(s) indentation
+indent-first-lines	;indent this many lines at start of paragraph
+spread-before		;before spacing
+spread-after		;after spacing
+spread-between-same	;between same paragraph type spacing
+leading			;<number> | 'fixed | 'floating
+max-leading		;max baseline sep
+min-leading		;min baseline sep
+optimum-leading		;optimum baseline sep
+number			;bullet reference or number reference
+number-at		;(start end)
+frame-above		;graphic above para
+frame-below		;graphic below para
+reverse-flow?		;#t if RTL horizontal or BTT vertical
+drop-cap		;#f | <# lines> | 'paragraph-base
+drop-cap-size		;point size of dropped cap (0 = auto size)
+drop-cap-color		;color of drop cap
+drop-cap-frame		;(single double inverted)
+first-line-small-caps?	;#t to make first line all small caps
+justification		;(left right center full)
+min-word-spacing	;min % of space goes to inter-word space
+max-word-spacing	;max % of space goes to inter-word space
+optimum-word-spacing	;optimum % of space for inter-word space
+standard-space		;standard space (in ems)
+letter-spacing		;% of space goes to inter-letter space
+pair-kern?		;#t if automatic pair kerning enabled
+track-kern		;% track kerning
+hyphenate?		;#t if hyphenation is enabled
+hyphenation-style	;(dash dot underline none (special . <ucs>))
+shortest-word		;don't hyphenate for words this size or smaller
+shortest-prefix		;don't abandon prefixes this size or smaller
+shortest-suffix		;don't abandon suffixes this size or smaller
+adjacent-hyphenations	;don't hyphenate more than this many lines
+hanging-punctuation?	;#t to allow outboard punctuation
+start-at		;(anywhere top-of-column top-of-page)
+start-column-alignment	;(lead cap-height x-height baseline)
+keep-with-next?		;don't separate from next paragraph
+keep-with-previous?	;don't separate from previous paragraph
+widow-orphan-lines	;max number of widows or orphans
+interlinear?		;#t to show interlinear text (e.g., RUBI)
+interlinear-size	;% of primary text size
+interlinear-leading	;separation from primary text
+interlinear-justification;(left right center)
+vowels?			;#t to show vowels for Arabic/Hebrew
+cantillation-marks?	;#t to show Hebrew cantillation marks
+optional-ligatures?	;#t to show optional ligatures
+default-style		;default style
+default-font		;default font spec
+default-writing-system	;default writing system

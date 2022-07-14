@@ -1,0 +1,12 @@
+
+(load-option 'hash-table)
+(load-option 'format)
+
+(load "mitmacros")
+
+(load "afmdef")
+(load "glyphdef")
+
+(load "misc")
+(load "graphprim")
+(load "afm.com")

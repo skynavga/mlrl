@@ -1,0 +1,6 @@
+(load-option 'hash-table)
+(load-option 'format)
+(load "misc")
+(load "graphprim")
+(load "afmdef")
+(load "buildafm")

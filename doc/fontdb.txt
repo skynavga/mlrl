@@ -1,0 +1,936 @@
+
+Title:        Font System
+Version:      -- unassigned --
+Author:       Glenn Adams, Metis Technology, Inc.
+Created:      05/15/93
+Last Revised: Thu May 27, 1993 at 20:10:03
+Revised by:   Glenn Adams
+Access:       Metis Confidential
+Status:       Draft In Progress
+
+1.0     INTRODUCTION
+
+The font system provides the rendering and layout subsystem with a number
+of mechanisms for interacting with fonts during rendering and layout
+processing.  In particular, it provides a font catalog abstract data
+type which serves as a repository for font information.  One or more
+font catalog objects may be utilized during subsystem processing in
+order to obtain font and glyph metric data.
+
+A principal function of a font catalog is to provide a naming system
+for referencing font resources.  This naming system provides a formal
+mechanism for denoting a collection of font resources by means of
+a font specification.  A font specification is expected to be used
+by the style system as the primary mechanism for referring to fonts.
+The font catalog serves as a local registry for font specifications,
+mapping each specification to a descriptor, a non-negative integer
+which can be used to efficiently index font resources during rendering
+and layout processing, and, in particular, to imbed in glyph drawing
+streams for selecting the active font resources.
+
+This document describes the font specification mechanism and specifies
+an abstract interface for the font catalog data type.
+
+2.0     FONT SPECIFICATIONS
+
+A font specification is the primary means of identifying a font.  It shall
+be used by both the application and the subsystem to reference particular
+subsystem fonts or classes of subsystem fonts.
+
+A font specification is be parsed in order to produce an descriptor
+which serves as a shorthand for the font specification.  Such a descriptor
+is guaranteed to be unique within the context of a single font catalog;
+however, uniqueness is not guaranteed across multiple font catalogs.
+
+A font specification consists of a FAMILY, STYLE, and SIZE.  The family
+identifies the overall font family; the style identifies a particular
+instance in the style space possessed by the family; and, the size
+indicates the nominal size of the font (specified in points or other
+units).
+
+A font specification may leave any component unspecified.  For example,
+a family can be indicated without indicating a style or size.  Some
+portion of the style instance may be specified, while other portions
+remain unspecified (e.g., boldness may be specified, while width is not).
+Both family and style may be specified while size is not, and so on.
+
+When an underspecified font specification is used as a means of referencing
+one of a number of fonts, the font whose font specification matches the
+referencing specification best is chosen.  The procedure for determining
+the "best match" is defined below.
+
+*******
+Issues:
+
+  1. Various components of a font specification are names or symbols.
+     Will these symbols ever be visible to a user?  If so, then they
+     should be specified as PlainText UCS strings so that they may
+     be localized.
+
+  2. Should there be two (or more) forms for a font specification?  For
+     example, one which is oriented toward user display or plain text
+     encoding, i.e., employs name strings, and one which is oriented
+     toward binary encoding.  [See section 2.4]
+
+*******
+
+2.1     FONT FAMILIES
+
+A font family is a collection of one or more font resources which represent
+a particular set of design criteria employed by the font designer. The design
+criteria of a particular font family may be classified into fixed criteria and
+variable criteria.  Variable criteria may further be classified into
+discretely or continuously variable subclasses.  Examples of fixed criteria
+in a Roman font might be x-height to cap-height ratio, arm type (e.g.,
+straight, bowed, concave), midline type (e.g., standard, high, constant,
+constant low), etc.  Examples of variable criteria include obliqueness,
+proportion, weight, etc.  Some criteria may be fixed in one family but
+variable in another.  For example, serif style is usually a fixed criteria;
+however, certain families allow variations in the serif style.
+
+One particular design criteria is assumed to be variable in all cases: size.
+That is, the subsystem assumes that the glyphs of any font family may vary
+in size.  Because of this assumption, and because this criteria varies
+the most in actual usage, the size of a font is elevated to an autonomous
+criteria in a font specification.  This need have not been the case.  It
+could have been treated simply as a STYLE parameter, in which case a font
+specification would reduce to a < FAMILY, STYLE > pair rather than a
+< FAMILY, STYLE, SIZE > triple.
+
+Each variable design criteria of a font family is characterized by a style
+name and value pair; for example, < WEIGHT, 0.9 >, < PROPORTION, 0.5 >,
+< SERIF EXTENSION, 0.3 >, etc.  A style name and value pair may be
+abbreviated with a keyword, e.g., < WEIGHT, 0.7 > might be abbreviated
+with the keyword SEMIBOLD.  Variable design criteria will be called
+"style parameters" below.
+
+A font family may be considered to be a function whose independent variables
+are the style parameters and size.  The domain of the function is vector in
+(N+1)-space, where N is the number of style parameters (size is the additional
+dimension); the range of the function is a non-empty set of font resources
+whose union contains all the glyphs of the font family.  An example of this
+is the Adobe Minion family which allows variation in the WEIGHT, PROPORTION
+(or width), OPTICAL SIZE, OBLIQUENESS, and DISPLAY design criteria.  In the
+case of Adobe Minion, the families collection of glyphs is split into
+multiple font resources:
+
+  adobe-minion ( wght, wdth, opsz, oblq, disp, size ) => { <font resource> }+
+
+Some of these style parameters are discrete, e.g., display is a boolean
+style parameter, whereas oblique may be either 0.0 or 1.0; in contrast,
+weight and width are continuously variable over the range 0.0 to 1.0,
+while optical size can be any non-negative value.  An example of the
+value of this function for a particular point in the style parameter
+space might be:
+
+  adobe-minion ( 0.5, 0.5, 12.0, 0.0, 0.0, 12.0 ) => { f0, f1, f2, f3 }
+
+where the font resources f0 - f3 map as follows:
+
+  f0 - Minion Regular Normal
+  f1 - Minion Regular Normal Small Caps, Sups, Subs, Fractions, Misc.
+  f2 - Minion Regular Normal Swash Caps, Swash Ligatures
+  f3 - Minion Regular Normal Ornaments
+
+The overall glyph collection of the Minion family contains the standard
+Adobe glyphs, swash and small cap versions of the letter glyphs, a collection
+of ornament glyphs, and miscellaneous other glyphs such as superscript,
+subscript, and fraction glyphs.
+
+2.2     FONT STYLES
+
+Font styles are specified as a list of style parameters.  This specification
+is used in a general font specification and as arguments to various functions.
+The form of a font style parameter list is as follows:
+
+  <style param list>      := { <style param> }*
+  <style param>           := <style param decl> | <style keyword name>
+  <style param decl>      := <style param name> <style param value>
+  <style keyword name>    := <symbol>
+  <style param name>      := <symbol>
+  <style param value>     := <number> | <boolean>
+
+Some examples of font style lists (using Scheme syntax for example's sake)
+might be:
+
+  '( ( WEIGHT . 0.9 ) ( PROPORTION . 0.3 ) ( OBLIQUE . -1.0 ) )
+
+This might be equivalent to the following form using style keywords:
+
+  '( BOLD EXPANDED REVERSE-OBLIQUE )
+
+When matching a font style specification against a font family, it may
+be that no font resources exactly match the specification.  In such a
+case, it may be necessary to find the font resources which provide the
+closest match possible.  In order to find approximate style mappings,
+the following function can be used
+
+  style-parameter-list
+    match-font-style-spec
+      ( font-catalog, family, style-parameter-list, style-priority-list )
+
+This function will take a style parameter list which may or may not have
+an exact match and return the closest match (which may be identical).  The
+closest match is determined by means of the style-priority-list parameter
+which specifies the priorities for each style parameter and a range variation
+for the parameter.  This list is specified as follows:
+
+  <style priority list>   := { <style priority spec> } *
+  <style priority spec>   := <style param name> <style param value rng>
+  <style param value rng> := <min-value> <max-value>
+  <min-value>             := <number>
+  <max-value>             := <number>
+
+An example of a priority list might be:
+
+  '( WEIGHT ( PROPORTION ( 0.8 1.0 ) ) )
+
+This list specifies a sorting order for the extant style list, with
+there being two keys:  a primary weight key and a secondary proportion
+key.  In addition, the range value specified for the secondary key
+serves to eliminate any entry outside the specified range.  If an
+extant style parameter remains unspecified in the priority list, then
+it is ignored during matching.
+
+As an example, take the following:
+
+extant styles := '( ( ( WEIGHT 0.5 ) ( PROPORTION 0.5 ) ( OBLIQUE 0.0 ) )
+                    ( ( WEIGHT 0.9 ) ( PROPORTION 0.5 ) ( OBLIQUE 0.0 ) )
+                    ( ( WEIGHT 0.5 ) ( PROPORTION 0.9 ) ( OBLIQUE 0.0 ) )
+                    ( ( WEIGHT 0.9 ) ( PROPORTION 0.9 ) ( OBLIQUE 0.0 ) )
+                    ( ( WEIGHT 0.5 ) ( PROPORTION 0.5 ) ( OBLIQUE 1.0 ) )
+                    ( ( WEIGHT 0.9 ) ( PROPORTION 0.5 ) ( OBLIQUE 1.0 ) )
+                    ( ( WEIGHT 0.5 ) ( PROPORTION 0.9 ) ( OBLIQUE 1.0 ) )
+                    ( ( WEIGHT 0.9 ) ( PROPORTION 0.9 ) ( OBLIQUE 1.0 ) ) )
+
+style list    := '( ( WEIGHT 0.8 ) ( PROPORTION 0.8 ) ( OBLIQUE 1.0 ) )
+
+priority list := '( WEIGHT ( PROPORTION ( 0.8 1.0 ) ) )
+
+Since there is no exact match for the specified style list, the extant
+styles are searched according to the priority list.  First, they are
+reordered according to weight delta, producing:
+
+extant styles := '( ( ( WEIGHT 0.9 ) ( PROPORTION 0.5 ) ( OBLIQUE 0.0 ) )
+                    ( ( WEIGHT 0.9 ) ( PROPORTION 0.9 ) ( OBLIQUE 0.0 ) )
+                    ( ( WEIGHT 0.9 ) ( PROPORTION 0.5 ) ( OBLIQUE 1.0 ) )
+                    ( ( WEIGHT 0.9 ) ( PROPORTION 0.9 ) ( OBLIQUE 1.0 ) )
+                    ( ( WEIGHT 0.5 ) ( PROPORTION 0.5 ) ( OBLIQUE 0.0 ) )
+                    ( ( WEIGHT 0.5 ) ( PROPORTION 0.9 ) ( OBLIQUE 0.0 ) )
+                    ( ( WEIGHT 0.5 ) ( PROPORTION 0.5 ) ( OBLIQUE 1.0 ) )
+                    ( ( WEIGHT 0.5 ) ( PROPORTION 0.9 ) ( OBLIQUE 1.0 ) ) )
+
+Next the extant styles with the same primary key value (i.e., weight delta)
+are reordered by proportion, with proportion values outside the range being
+culled.
+
+extant styles := '( ( ( WEIGHT 0.9 ) ( PROPORTION 0.9 ) ( OBLIQUE 0.0 ) )
+                    ( ( WEIGHT 0.9 ) ( PROPORTION 0.9 ) ( OBLIQUE 1.0 ) )
+                    ( ( WEIGHT 0.5 ) ( PROPORTION 0.9 ) ( OBLIQUE 0.0 ) )
+                    ( ( WEIGHT 0.5 ) ( PROPORTION 0.9 ) ( OBLIQUE 1.0 ) ) )
+
+Since no entries remain in the priority list, the first element of the
+reordered list is returned:
+
+matched style := '( ( WEIGHT 0.9 ) ( PROPORTION 0.9 ) ( OBLIQUE 0.0 ) )
+
+Notice that the second element of the reordered list is actually closer
+since it has an exact match on the specified oblique parameter; however,
+since oblique wasn't specified in the priority list, it is completely
+ignored.  If the closest oblique style is required, then the priority
+list should augmented as follows:
+
+priority list := '( WEIGHT ( PROPORTION ( 0.8 1.0 ) ) OBLIQUE )
+
+In this case, the extant styles with the same primary and secondary key
+values (i.e., weight and proportion deltas) are reordered once more prior
+to returning:
+
+extant styles := '( ( ( WEIGHT 0.9 ) ( PROPORTION 0.9 ) ( OBLIQUE 1.0 ) )
+                    ( ( WEIGHT 0.9 ) ( PROPORTION 0.9 ) ( OBLIQUE 0.0 ) )
+                    ( ( WEIGHT 0.5 ) ( PROPORTION 0.9 ) ( OBLIQUE 1.0 ) )
+                    ( ( WEIGHT 0.5 ) ( PROPORTION 0.9 ) ( OBLIQUE 0.0 ) ) )
+
+Then, the first entry would be returned:
+
+matched style := '( ( WEIGHT 0.9 ) ( PROPORTION 0.9 ) ( OBLIQUE 1.0 ) )
+
+2.3     FONT SIZES
+
+The third element of a font specification is a font size.  This size
+is specified as follows:
+
+  <font size>             := <font size value> <font size units>
+  <font size value>       := <number>
+  <font size units>       := <symbol>
+
+The units component must be one of the following symbols:
+
+  '( PT PTS POINT POINTS IN INCH INCHES MM NM MICRON MICRONS ... )
+
+*******
+Issues:
+
+  1. Should there be a programmatic way to extend the collection of
+     font size units?  For example, a way to register a symbol for
+     use as a font size unit along with a conversion factor to a known
+     unit, such as:
+
+     register-font-size-units-symbol ( symbol, micropoints-per-unit )
+
+*******
+
+2.4     FONT SPECIFICATION FUNCTIONS
+
+A number of utilities are required for processing font specifications.
+The first, parse-font-spec(), will take a font specification string
+and return a form which efficiently represents the font specification;
+the function unparse-font-spec() will perform the converse, taking a font
+spec and returning the external form of the font spec.
+
+Font spec interning is performed in the context of a particular environment;
+therefore, the environment must be passed as an argument to these functions.
+
+font-spec
+  parse-font-spec ( env, font-spec-string )
+
+font-spec-string
+  unparse-font-spec ( env, font-spec )
+
+In order to determine the current font specifications in an
+environment, the following function is required:
+
+void
+  enumerate-font-specs ( env, enum-font-spec-proc, data )
+
+boolean
+  enum-font-spec-proc ( font-spec, data )
+
+For each font spec in the specified environment, the function
+enum-font-spec-proc will be called until it returns #f or until no font
+specifications remain.
+
+The data argument supplied to this function is that provided to the
+enumerate-font-specs function.
+
+The representation of a font specification shall be an opaque object
+interpreted only by the subsystem.
+
+*******
+Issues:
+
+  1. A concrete syntax for an external font specification needs
+     to be chosen.
+
+*******
+
+A number of functions are required for extracting information
+about the various components of a font specification.
+Another is needed to test containment of font specifications.
+
+font-family
+  font-spec-family ( font-spec )
+
+font-style-parameter-list
+  font-spec-style-parameters ( font-spec )
+
+font-size
+  font-spec-size ( font-spec )
+
+boolean
+  font-specs-unifiable? ( font-spec-1, font-spec-2 )
+
+The preceding function tests whether the two font specifications may
+be unified; i.e., they do not contain contradictory components; e.g.,
+( TIMES ( ( WEIGHT 0.9 ) ) 12.0 ) is unifiable with ( TIMES '() '() ),
+that is, it specializes the latter by adding a style and size component.
+On the other hand, ( TIMES '() 12.0 ) is not unifiable with ( TIMES '() 1.0 ),
+since the two specified sizes are incompatible.
+
+font-spec
+  unify-font-specs ( font-spec-1, font-spec-2 )
+
+This function takes two font specs, unifies them if possible,
+and returns the unified font spec.  If they are not unifiable, a
+special value is returned, invalid-font-spec.
+
+*******
+Issues:
+
+  1. Do the preceding functions need the environment as an
+     additional argument?
+
+  2. If not, what if the two arguments of font-specs-unifiable? or font-specs-
+     unify derive from different environments?
+
+*******
+
+3.0     FONT RESOURCE DESCRIPTORS
+
+A font resource descriptor is a 32-bit binary value of which the least
+24 bits are used to specify a font resource set and a font resource in
+the specified font resource set.  The format of the descriptor follows:
+
+         31     24 23     16 15               00
+         _______________________________________
+        |         |         |                   |
+        |   MBZ   |   ELT   |   FONT SET INDX   |
+        |_________|_________|___________________|
+
+
+The field FONT SET INDX is a 16-bit integer identifying a particular
+font resource set.  It must be non-zero in a valid descriptor.
+
+The 8-bit field, ELT, specifies the font resource within a font resource
+set.  If this field is ZERO, then no resource is identified; in this case,
+the descriptor refers to all font resources within a font resource set,
+that is, it refers to the font resource set rather than a particular
+resource in the set.  Because ZERO is reserved for this purpose, ELT
+is the nth element of a font resource set (i.e., ordinal rather than
+cardinal indexing is used).
+
+A font resource descriptor whose (coerced) integer value is zero is
+considered an invalid font resource descriptor.
+
+This descriptor format allows for 65,535 distinct font resource sets,
+where each such set can contain as many as 255 font resources.
+
+The following functions provide a mechanism for creating and
+extracting the fields of a font resource descriptor.  The
+arguments font-resource-set and font-resource-set-element are
+non-zero integers which index a font resource set within a font
+catalog, or a font resource set element within a font resource
+set.
+
+font-resource-desc
+  make-font-resource-desc
+        ( font-resource-set, font-resource-set-element )
+
+font-resource-set
+  font-resource-desc->font-resource-set
+        ( font-resource-desc )
+
+font-resource-set-element
+  font-resource-desc->font-resource-set-element
+        ( font-resource-desc )
+
+
+4.0     FONT CATALOGS
+
+Font catalogs are the primary repository for information about font
+resources.  The primary function of a font catalog is to map font
+specifications to font resource descriptors, and to provide information
+about font resources denoted by these descriptors.
+
+One or more font catalogs may be created within the context of an
+environment.  Once created, font resources may be registered with
+a font catalog, after which point those resources may be referenced
+through the catalog.
+
+A font resource contains a back pointer to the environment in which
+it is created.  This allows subsequent operations on a font catalog
+to reference the environment without it being explicitly passed as
+an argument to the operation.
+
+*******
+Issues:
+
+  1. Does a font catalog require environment access?  For what purpose?
+
+*******
+
+When created, a font catalog contains no font resources.  Font resources
+may be added by the following function which adds the specified font
+resource to a font catalog.  A font resource descriptor is assigned to
+the font resource and returned.
+
+font-resource-desc
+  extend-font-catalog
+        ( font-catalog, font-resource )
+
+Each font resource is a member of some font resource set, with which
+it shares an identical fully specified font specification.  Different
+font resources in a font resource set contribute glyph sub-complements
+to the overall glyph complement implemented by the font resource set.
+All font resource sets within a font catalog may be enumerated using
+the following function.
+
+void
+  enumerate-font-resource-sets
+        ( font-catalog, enum-font-resource-set-proc, data )
+
+boolean
+  enum-font-resource-set-proc
+        ( font-resource-desc, data )
+
+The supplied enumeration proc is called for each font resource set
+until it returns #f or until no font resource sets remain.
+
+All font resources in a font catalog, irrespective of their containing
+font resource sets may be enumerated using the following function.
+
+void
+  enumerate-font-resources
+        ( font-catalog, enum-font-resource-proc, data )
+
+boolean
+  enum-font-resource-proc
+        ( font-resource-desc, data )
+
+The supplied enumeration proc is called for each font resource
+until it returns #f or until no font resources remain.
+
+The font resource set in a font catalog which corresponds to a particular
+font specification may be obtained with the following.  If no
+font resource satisfies the font specification, then a special value
+is returned, invalid-font-resource-desc, defined to be equal to zero.
+Otherwise, a valid font resource descriptor is returned which refers
+to the corresponding font resource set.
+
+font-resource-desc
+  lookup-font-spec
+        ( font-catalog, font-spec )
+
+font-spec
+  font-resource-desc->font-spec
+        ( font-catalog, font-resource-desc )
+
+The maximally specified font specification which would map to a given
+font resource descriptor is returned by the following function.  This
+function is not necessarily the inverse of the previous function; rather,
+if the first function is called f(x) and the following g(y), with x
+a font spec, and y a font resource desc, then
+
+  g ( f ( x ) ) = unification ( x, x' )
+
+where x' is the font specification bound to the font resource to which
+f ( x ) refers.  What this says is that the original font specification
+provided to the lookup function may be underspecified; therefore, since
+the result of g ( f ( x ) ) is maximally specified, they may not be eqv?,
+however, they will always be unifiable.  [Unless f(x) = 0, in which case
+there was no mapping for x.]
+
+A property of a font may be queried with the following function.  The
+font resource descriptor must refer to an actual font resource, and not
+a font resource set.  If the specified font property is not present, the
+value not-present is returned.  Otherwise, the value of the property is
+returned.
+
+font-prop-value
+  lookup-font-prop
+        ( font-catalog, font-resource-desc, font-prop-name, not-present )
+
+*******
+Issues:
+
+  1. What kinds of font property values should be supported?  I would
+     think that either an immediate value is returned, e.g., a boolean,
+     integer or float, or that a pointer is returned.  In these cases
+     a (void *) type would suffice as the type of the returned value.
+
+  2. It may be that a better mechanism for indicating that a property
+     isn't present should be used, e.g., succeed and fail continuations.
+
+*******
+
+The extant properties of a font may be enumerated with the following.
+[Note: the notion of metrics is embodied by the notion of properties
+as used below; that is, an individual metric, of whatever kind, is
+considered to represent some named property of a font or of a glyph.]
+
+void
+  enumerate-font-props
+        ( font-catalog, font-resource-desc, enum-font-prop-proc, data )
+
+boolean
+  enum-font-prop-proc
+        ( font-prop-name, font-prop-value, data )
+
+The supplied enumeration proc is called for each font property
+until it returns #f or the no font properties remain.
+
+All the glyphs contained in a font resource set may be learned by means
+of the following.  For each glyph, the specified enumeration function
+is called with a glyph reference as an argument.  Glyph references
+may be used to query a glyph about its properties, i.e., its metrics.
+See section 6.0 for information on glyph references.
+
+If the font resource descriptor specified in this function refers to
+a font resource set, rather than a particular font resource in a
+font resource set, then all glyphs in the font resource set's font
+resources are enumerated.
+
+void
+  enumerate-font-resource-glyphs
+        (
+          font-catalog,
+          font-resource-desc,
+          enum-glyph-proc,
+          data
+        )
+
+boolean
+  enum-glyph-proc
+        ( glyph-reference, data )
+
+The supplied enumeration proc is called for each glyph until it
+returns #f or the no glyphs remain.
+
+A font resource can be queried regarding whether it supports (in
+an unspecified manner), the ability to display one or more characters
+specified in character-list.  These characters are designated using
+ISO/IEC 10646 UCS-4 encodings.  If all characters are supported,
+in whatever minimum manner possible, e.g., by means of an instance of
+the nominal glyph displayed in the ISO/IEC 10646 character charts,
+then #t is returned; otherwise, #f is returned.
+
+boolean
+  font-resource-supports-chars?
+        ( font-catalog, font-resource-desc, character-list )
+
+The following function is like the former except that the character
+repertoire of interest is specified by means of the iso10646 subset
+identifier as specified in Annex A of the standard ISO/IEC 10646-1:1993. 
+
+boolean
+  font-resource-supports-char-subset?
+        ( font-catalog, font-resource-desc, iso10646-subset )
+
+The complement of ISO/IEC 10646 characters which a font (minimally)
+supports may be learned by means of the following enumeration function
+which calls enum-supported-char-proc for each ISO/IEC 10646 character
+which can be minimally displayed by the font resource.  In addition,
+a glyph reference (not necessarily the best one) is specified for each
+character code.
+
+void
+  enumerate-supported-chars
+        ( font-catalog, font-resource-desc, enum-supported-char-proc, data )
+
+boolean
+  enum-supported-char-proc
+        ( character-code, glyph-reference, data )
+
+The supplied enumeration proc is called for each character displayable
+until it returns #f or the no non-specified displayable characters remain.
+The order of characters returned by consecutive invocations is not
+defined.
+
+A property of an individual glyph may be obtained by means of the
+following.  If it isn't present, then the special value not-present
+is returned.
+
+glyph-prop-value
+  lookup-glyph-prop
+        (
+          font-catalog,
+          font-resource-desc,
+          glyph-reference,
+          glyph-prop-name,
+          not-present
+        )
+
+*******
+Issues:
+
+  1. What kinds of glyph property values should be supported?  I would
+     think that either an immediate value is returned, e.g., a boolean,
+     integer or float, or that a pointer is returned.  In these cases
+     a (void *) type would suffice as the type of the returned value.
+
+  2. It may be that a better mechanism for indicating that a property
+     isn't present should be used, e.g., succeed and fail continuations.
+
+*******
+
+The extant properties of a glyph may be enumerated with the following.
+
+void
+  enumerate-glyph-props
+        (
+          font-catalog,
+          font-resource-desc,
+          glyph-reference,
+          enum-glyph-prop-proc,
+          data
+        )
+
+boolean
+  enum-glyph-prop-proc
+        ( glyph-prop-name, glyph-prop-value, data )
+
+The supplied enumeration proc is called for each glyph property
+until it returns #f or the no glyph properties remain.
+
+5.0	FONT RESOURCE SETS
+
+5.0     FONT RESOURCES
+
+A font resource corresponds one-to-one with a system supplied
+font.  Each such font resource must be created and then inserted
+into a font catalog in order for it to be available for use in
+the font subsystem.  A font resource object is created as follows:
+
+font-resource
+  create-font-resource
+        ( system-font-descriptor )
+
+The system supplied font descriptor associate with a particular
+font resource may be obtained by means of the following.
+
+system-font-descriptor
+  font-resource->system-font-descriptor
+        ( font-resource )
+
+Given a font resource, return the maximally specified font
+specification describing this font resource.
+
+font-spec
+  font-resource->font-spec
+        ( font-resource )
+
+Font resources are designed to support the display needs of particular
+writing systems.  That is, a font is not generally designed to support
+an entire script, i.e., all the symbols used by all writing systems of
+a particular script; rather, it is usually specifically oriented towards
+a particular set of symbols drawn from some script(s) for the purpose
+of supporting a particular written language.  A font resource should
+specify this collection of writing systems.  This collection can then
+be determined by means of the following enumeration function, which
+calls the enumeration procedure for each writing system supported.  A
+second argument to the enumeration procedure specifies whether support
+is full or partial.
+
+void
+  enumerate-font-resource-writing-systems
+        ( font-resource, enum-writing-system-proc, data )
+
+boolean
+  enum-writing-system-proc
+        ( writing-system, partial, data )
+
+The supplied enumeration proc is called for each supported writing
+system until it returns #f or the no supported writing systems remain.
+
+*******
+Issues:
+
+  1. The question of full or partial support of a particular writing
+  system should be a predicate of an entire font resource set rather
+  than a particular font resource.  This is due to the fact that the
+  different font resources in a font resource set should jointly
+  support some writing system(s).  With this in mind, a font resource
+  which declares partial support of a particular writing system is
+  assumed to coexist in a font resource set with other font resources
+  which provide the remaining support for the writing system.  Is this
+  a reasonable assumption to make, or one that can be enforced?
+
+*******
+
+The glyph complement of a particular font resource can be obtained
+by means of the following function.  The glyph complements of the
+individual font resources which make up a font resource set are
+combined to form the overall glyph complement of the entire font
+resource set.
+
+glyph-complement
+  font-resource->glyph-complement
+        ( font-resource )
+
+6.0     GLYPH REFERENCES
+
+         31     24 23     16 15               00
+         _______________________________________
+        |         |         |                   |
+        |   MBZ   |   FRE   |    GLYPH INDEX    |
+        |_________|_________|___________________|
+
+
+*******
+Issues:
+
+  1. Should a glyph reference indicate which font resource in a
+     font resource set it is contained in?
+
+*******
+
+7.0     GLYPH COMPLEMENTS
+
+The glyphs contained in a glyph complement may be enumerated by means
+of the following function.  The enumeration proc is invoked for
+each glyph with the glyph reference, glyph class, and glyph features as
+its arguments.  The glyph reference specifies the glyph within a
+particular font resource which forms part of the glyph complement.
+[Recall that a glyph complement is associated with a font resource
+set rather than a particular font resource, the overall collection
+of glyphs represented by the complement are distributed across the
+various font resources contained within the font resource set.]
+
+The glyph class serves to identify each glyph according to a set
+of related glyphs.  Glyph features is an array of one or more long
+words (32-bit unsigned longs) which specify the features which
+discriminate the various glyphs within a glyph class.  The representation
+of these features is specified below in section 7.3.
+
+void
+  enumerate-glyphs
+        ( glyph-complement, enum-glyph-proc, data )
+
+boolean
+  enum-glyph-proc
+        ( glyph-reference, glyph-class, glyph-features, data )
+
+The supplied enumeration proc is called for each glyph until it
+returns #f or the no glyphs remain.
+
+A glyph complement may contain additional ligature sub-tables.  The
+ligatures specified by these sub-tables may be enumerated by means
+of the following function.  Each of the component glyphs which are
+joined to form a single ligature glyph are specified by a self-
+terminating array of component glyph references.
+
+void
+  enumerate-ligatures
+        ( glyph-complement, enum-ligature-proc, data )
+
+boolean
+  enum-ligature-proc
+        ( glyph-reference, component-glyph-references, data )
+
+The supplied enumeration proc is called for each ligature until it
+returns #f or the no ligatures remain.
+
+A glyph complement may contain additional glyph template sub-tables.
+A glyph template is similar to a ligature in that it is the joining
+of multiple glyphs; however, it differs in that the result is not
+a single glyph, but multiple glyphs which are superimposed onto
+each other.  Examples of glyph templates are Latin letter and diacritic
+combinations, Korean Hangul syllable blocks, stroke decompositions of
+Arabic contextual forms, etc.
+
+[Note: a template glyph is like a "composite glyph" which is formed
+by referring to other glyphs in order to compose the glyph.]
+
+The templates specified by these sub-tables may be enumerated by means
+of the following function.  Each of the component glyphs which are
+joined to form a single template glyph are specified by a self-terminating
+array of component glyph references.
+
+void
+  enumerate-templates
+        ( glyph-complement, enum-template-proc, data )
+
+boolean
+  enum-template-proc
+        ( glyph-reference, component-glyph-references, data )
+
+The supplied enumeration proc is called for each template until it
+returns #f or the no templates remain.
+
+7.1     GLYPH CLASSES
+
+A glyph class is associated with each glyph in a glyph complement.
+This glyph class takes the form of an ISO/IEC 10646-1:1993 character
+code value which is used to identify one or more glyphs which may
+be used to depict that character.
+
+Not all glyphs may be identified with an ISO/IEC 10646 character code.
+For example, ligatures and glyph template components may not map.  In
+the former case, it is an N-1 mapping; in the latter case it is a 1-N
+mapping.  In these cases, the glyph class value is taken from the
+64 control codes of ISO/IEC 10646; i.e., from the ranges 0000 - 001F
+and 0080 - 009F.  The special glyph class codes currently defined are:
+
+                   Special Glyph Classes
+
+        Value             Description
+
+          0             Ligature glyph, 2 elements
+          1             Ligature glyph, 3 elements
+          2             Ligature glyph, 4 elements
+          3             Ligature glyph, 5 elements
+          4             Ligature glyph, 6 elements
+          5             Ligature glyph, 7 elements
+          6             Ligature glyph, >7 elements
+       07 - 0F          Not assigned
+         10             Glyph Template Component, 1 of 2
+         11             Glyph Template Component, 1 of 3
+         12             Glyph Template Component, 1 of 4
+         13             Glyph Template Component, 1 of 5
+         14             Glyph Template Component, 1 of 6
+         15             Glyph Template Component, 1 of 7
+         16             Glyph Template Component, 1 of >7
+       17 - 1F          Not assigned
+       80 - 9F          Not assigned
+
+Glyphs which fall into these special glyph classes are more fully
+specified in sub-tables of the glyph complement table.  In particular,
+those defined above are specified further in the ligature sub-tables
+or in the template component sub-tables.
+
+7.2     GLYPH FEATURES
+
+Glyph features are represented as one or more 32-bit words into which
+feature values are packed.  Two formats of feature value formats are
+employed: a basic format and an extended format.  In the basic format,
+a single 32-bit word contains all features; in the extended format, one
+or more 32-bit words contain the features.  The determination of whether
+basic or extended glyph features are used can be made by examining the
+MSB (bit 31) of the first glyph features long word.  If it is zero,
+then the basic format is used; otherwise, the extended format is used.
+
+The basic glyph features format is follows.  In this format, a fixed set
+of known features is provided; in addition, a script specific feature
+field is provided for the needs of more complex scripts.
+         ______________________________________
+        | | |      |      |      |      |      |
+        |X|V| SCRP | SWSH | SHAP | SIZE | POSN |
+        |_|_|______|______|______|______|______|
+
+
+  Bits  Name    Description
+
+  05-00 POSN    Position variant indicator (indep, initial, medial, ...)
+  11-06 SIZE    Size variant indicator (normal, small, wide, ...)
+  17-12 SHAP    Shape variant indicator (small cap, sup/sub, mirror, ...)
+  23-18 SWSH    Swash variant indicator
+  29-24 SCRP    Script specific variant indicator
+  30    V       Vertical layout variant
+  31    X       Extended features vector format (= 0 for basic)
+
+The extended glyph features format is represented as an array of packed
+unsigned shorts, in which is specified a feature name and a feature
+value.  The most significant bit of each unsigned short must be set
+to one if its field's are valid.  In particular, the MSB of feature
+0 (F0 field) of the first extended glyph features long word must be
+one; i.e., an empty extended feature list is not allowed.
+
+Extended Glyph Features Format
+
+         31 30  24 23     16 15 14  08 07     00
+         _______________________________________
+        |  |      |         |  |      |         |
+        |F0| NAM0 |  VALU0  |F1| NAM1 |  VALU1  |
+        |__|______|_________|__|______|_________|
+
+The values of the name sub-fields may be any of a set of enumerated
+feature names.  The interpretation of the value field is dependent on
+the feature so named.
+
+This extended glyph feature mechanism allows supporting unusual glyph
+features which are not covered by the basic glyph features format.
+
+                Glyph Feature Names
+
+        Value             Name
+
+          0             Reserved
+          1             Position Variant
+          2             Size Variant
+          3             Shape Variant
+          4             Swash Variant
+          5             Script Specific Variant
+          6             Layout Variant
+        7 - 126         Unassigned
+         127            Reserved
+

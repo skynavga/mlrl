@@ -1,0 +1,389 @@
+
+Title:        Character to Glyph Mapping
+Version:      -- unassigned --
+Author:       Glenn Adams, Metis Technology, Inc.
+Created:      05/27/93
+Last Revised: Wed Jun 2, 1993 at 17:23:24
+Revised by:   Glenn Adams
+Access:       Metis Confidential
+Status:       Draft In Progress
+
+1.0     INTRODUCTION
+
+1.1     TERMINOLOGY
+
+In the following, the term TEMPLATE is used to refer to a symbol which
+is a linear combination of two or more symbols.  This is contrasted with
+the term LIGATURE, which is used to refer to a symbol which is a non-
+linear combination of two or more symbols.  A TEMPLATE may be dynamically
+composed by combining its component symbols in the proper position; whereas,
+a LIGATURE may not be dynamically composed due to its non-linear properties.
+
+2.0     MAPPING SCENARIOS
+
+2.1     1-1 MAPPINGS
+
+Scenario 1
+
+ - 1 char, 1 glyph
+
+This is the normal case which holds with many characters, such as Latin
+text w/o ligatures, Chinese and Japanese text, etc.  The mapping system
+should optimize for this case.
+
+This case also describes the case where templates and ligatures are
+encoded as single characters and map to single glyphs representing
+such templates and ligatures, respectively.  In addition, this case
+covers mappings where one character maps to one of a number of possible
+glyphs in a context-sensitive manner (e.g., Arabic contextual variants)
+or in a non-context-sensitive manner (e.g., as a free style variant).
+
+2.2     1-N MAPPINGS
+
+Scenarios 2, 3
+
+ - 1 char, N glyphs, glyphs have character counterparts
+ - 1 char, N glyphs, at least one glyph does not have character counterpart
+
+where N > 1, glyph proximity unspecified.
+
+When a template is encoded as a character but the template's composite
+symbol is not available as a glyph, then 1 to N mappings may arise.  In
+this case, the template's components may each have a corresonding character
+counterpart.  For example, if N WITH TILDE is a template encoding and the
+composite is not available as a glyph, but glyphs for N and COMBINING TILDE
+are available, then the template character encoding can be decomposed
+into a template component character encoding.  The same condition applies
+when a ligature is encoded as a character but its (non-linear) components
+are all that are available in a font.  In this case, the components would
+have to be displayed separately without ligation.
+
+The situation may also arise where a template is encoded as a character,
+but one or more of its components do not have corresponding character
+encodings.  For example, an Arabic font may provide contextual form glyphs
+without dots and one or more dot glyphs.  No character encoding provides
+characters for separated dots in this fashion.  Consequently, the character
+cannot be mapped to glyphs each of which have character counterparts.
+
+2.3     N-1 MAPPINGS
+
+Scenarios 4, 5
+
+ - N chars, 1 glyph, glyph has character counterpart
+ - N chars, 1 glyph, glyph does not have character counterpart
+
+where N > 1.
+
+Ligatures are usually not directly encoded as characters; rather, they
+are generated as single glyphs which represent multiple characters.  The
+same situation holds when multiple characters are used to encode a
+template's components; that is, a decomposed encoding of a composite
+symbol.  In such cases, a ligature or a decomposed composite symbol
+may have an encoded character counterpart.  For example, this is the
+case for Latin ligature and letter plus diacritic composite symbol
+encodings.
+
+It may often be the case that a ligature or a template does not have
+an encoded character counterpart.  This is the case for complex
+Arabic ligatures, for unencoded Latin base letter plus diacritic
+combinations, and for unencoded Korean Hangul syllable blocks templates.
+
+2.4     M-N MAPPINGS
+
+Scenarios 6, 7
+
+ - M chars, N glyphs, glyphs have character counterparts
+ - M chars, N glyphs, at least one glyph does not have character counterpart
+
+where M > 1, N > 1, glyph proximity unspecified.
+
+More complex scenarios may arise when in the case that a composite symbol
+is encoded as multiple characters, and when the composite symbol is not
+available as a single glyph, but can be composed from multiple glyphs which
+do not correspond directly with the decomposed composite encoding.  For
+example, a Latin text may decompose the composite symbol E WITH CIRCUMFLEX
+AND TILDE as the three characters E, COMBINING CIRCUMFLEX, COMBINING TILDE;
+however, a font might contain only the glyphs E WITH CIRCUMFLEX and
+COMBINING TILDE.  In this case there would be a 3-2 mapping.
+
+In M-N mappings, it may or may not be the case that the N glyphs have
+encoded character counterparts.  In the above example in ISO 10646, there
+are counterpart characters for E WITH CIRCUMFLEX and COMBINING TILDE;
+however, in the following example, there is not a corresponding character
+representation.
+
+  ETHIOPIAN CH, ETHIOPIAN U =>
+    ethiopian tu, top cross stroke (looks like phonetic ae)
+
+In this case, neither of the resultant glyphs have encoded character
+counterparts.
+
+3.0     MAPPING PHASES
+
+Rendering processing will proceed according to a number of distinct
+processing phases.  Each phase can be viewed as a transformation on
+the input data; the result of a transformation serves as the input
+for the immediately following transformation.
+
+The rendering processing phases are as follows:
+
+  - Decomposition
+  - Reordering
+  - Selection
+  - Composition
+  - Attachment
+
+The ordering of phases is as specified above and is crucial to correct
+rendering processing.
+
+Each processing phase may be implemented as a separate function; however,
+multiple functions may be merged in order to produce better space/time
+efficiency while trading off simplicity.
+
+The processing phases described here are the result of a generalization of
+the overall rendering requirements of the world's writing systems.  All
+existing and historical writing systems are accommodated by means of these
+processing phases.
+
+Each of the following subsections contains a basic algorithm which describes
+the primary processing of a particular phase.  In the interest of clarity,
+the following are left out:  parameter types, error checking, reverse mapping
+(glyph -> char) structure maintenance, and the impact of style sheets on
+processing (e.g., font runs, writing system runs, rendering parameters, etc.).
+
+3.1     DECOMPOSITION PHASE
+
+The first phase serves to decompose any characters into maximally decomposed
+atomic characters while fixing the order of non-typographically interacting
+non-spacing marks.  This process provides a canonical encoding and encoding
+order for subsequent processing phases.
+
+The following pseudo-code indicates the general decomposition process.  Given
+a source and target string, map SOURCE over the range [START,END], placing the
+results in TARGET, while using the decomposition map, MAP.
+
+  decompose ( source, start, end, target, map )
+  {
+    string result
+    offset index = start
+    bool   found
+
+    while ( index < end ) {
+      found   = lookup ( map, source, index, &result )
+      target  = append ( target, source, index, found ? length ( result ) : 1 )
+      index  += found ? length ( result ) : 1
+    }
+  }
+
+3.2     REORDERING PHASE
+
+Given a canonically ordered, decomposed encoding from the previous phase, this
+phase reorders certain elements as needed on a per-script basis.  This phase
+is only required on certain scripts, such as the Indic scripts; it may be a
+no-op for other scripts.
+
+Given a code element class map, MAP, and a finite state machine FSM, reorder
+the code elements of SOURCE over the range [START,END] according to the
+actions embedded in FSM.
+
+  reorder ( source, start, end, map, fsm )
+  {
+    number s, ns, class, action
+    offset index = start, first, last
+    bool   found, found-first, found-last
+
+    found-first = found-last = false
+    while ( index < end ) {
+      found = lookup ( map, source, index, &class )
+      if ( ! found )
+        class = out-of-bounds
+      ns = next ( fsm, s, class, &action )
+      if ( mark-first? ( action ) )
+        first = index, found-first = true
+      if ( mark-last? ( action ) )
+        last  = index, found-last = true
+      if ( found-first && found-last ) {
+        reorder-codes ( source, first, last, reorder-mode ( action ) )
+        found-first = found-last = false
+      }
+      if ( ! dont-advance? ( action ) )
+        index ++
+    }    
+  }
+
+3.3     SELECTION PHASE
+
+Once the final order of elements is obtained, the selection of variant glyphs
+(allographs) may proceed.  This phase could not have proceeded earlier since
+context is not fixed until reordering is complete.  Two kinds of selection may
+occur in this phase in the following order: (1) stylistic (free variant)
+selection, then (2) contextual (deterministic) variant selection.  The former
+is facilitated by style attributes; the latter, by analyzing the context of
+an element.
+
+Given a code element class map, MAP, and a finite state machine FSM, select
+the glyph codes from the glyph complement, GC, which correspond to SOURCE
+over the range [START,END] according to the selection actions embedded in FSM,
+placing the output sequence of glyph codes in TARGET.
+
+  select ( source, start, end, target, map, fsm, gc )
+  {
+    string result
+    number s, ns, class, action
+    offset index = start, first, last
+    bool   found, found-first, found-last
+
+    found-first = found-last = false
+    while ( index < end ) {
+      if ( ! null? ( fsm ) ) {
+        found = lookup ( map, source, index, &class )
+        if ( ! found )
+          class = out-of-bounds
+        ns = next ( fsm, s, class, &action )
+        if ( mark-first? ( action ) )
+          first = index, found-first = true
+        if ( mark-last? ( action ) )
+          last  = index, found-last = true
+      } else {
+        first       = index
+        last        = index
+        found-first = true
+        found-last  = true
+        action      = direct-map-action
+      }
+      if ( found-first && found-last ) {
+        select-glyphs
+          ( source, first, last, select-mode ( action ), gc, &result )
+        target = append ( target, result )
+        found-first = found-last = false
+      }
+      if ( ! dont-advance? ( action ) )
+        index ++
+    }    
+  }
+
+This algorithm supports both context sensitive selection and direct variant
+selection; i.e., non-context-sensitive selection.  If no context sensitivity
+applies, then the FSM argument should be NULL.  In this case, the current
+code element is directly mapped through the glyph complement, GC.
+
+3.4     COMPOSITION PHASE
+
+In this phase, ligatures and templates are substituted for subsequences of
+elements produced by the preceding phase.  Composition may be controlled by
+means of style attributes which limit or govern the processing of this phase.
+
+The following pseudo-code indicates the general composition process.  Given
+a source and target string, map SOURCE over the range [START,END], placing the
+results in TARGET, while using the composition map, MAP.
+
+  compose ( source, start, end, target, map )
+  {
+    string result
+    offset index = start
+    bool   found
+
+    while ( index < end ) {
+      found   = lookup ( map, source, index, &result )
+      target  = append ( target, source, index, found ? length ( result ) : 1 )
+      index  += found ? length ( result ) : 1
+    }
+  }
+
+Notice that composition operates identically to decomposition except
+for using a different map; thus, the same code may implement both phases.
+
+3.5     ATTACHMENT PHASE
+
+The final processing phase is responsible for determining the attachment
+points to be used in composing composite symbols from glyphic elements.
+The resulting output is a sequence of composite symbols subsequences where
+each subsequence contains exactly one spacing element and zero or more
+non-spacing elements which attach to the spacing element.  The escapement
+of the spacing element is dynamically determined in this process by its
+normal escapement and the bounding boxes of the non-spacing marks attached
+to it.
+
+Given a glyph element class map, MAP, and a finite state machine FSM, attach
+the glyph codes in SOURCE over the range [START,END] according to the embedded
+actions embedded in FSM, placing the output sequence of attached glyph codes
+in TARGET.
+
+  attach ( source, start, end, target, map, fsm )
+  {
+    string result
+    number s, ns, class, action
+    offset index = start, first, last
+    bool   found, found-first, found-last
+
+    found-first = found-last = false
+    while ( index < end ) {
+      found = lookup ( map, source, index, &class )
+      if ( ! found )
+        class = out-of-bounds
+      ns = next ( fsm, s, class, &action )
+      if ( mark-first? ( action ) )
+        first = index, found-first = true
+      if ( mark-last? ( action ) )
+        last  = index, found-last = true
+      if ( found-first && found-last ) {
+        attach-glyphs ( source, first, last, attach-mode ( action ), &result )
+        target = append ( target, result )
+        found-first = found-last = false
+      }
+      if ( ! dont-advance? ( action ) )
+        index ++
+    }    
+  }
+
+3.5.1   ATTACHMENT OUTPUT FORM
+
+The following grammar indicates the form taken by the output of the
+attachment processing phase.  The concrete syntax generated by this
+grammar is for example purposes only.  The actual concrete syntax will
+be in a binary form suitable for direct insertion into the logical
+glyph stream which is the final output of the rendering subsystem.
+
+  output             := symbol | list-of-symbols
+  list-of-symbols    := '(' { symbol }* ')'
+  symbol             := atomic-symbol | composite-symbol
+  composite-symbol   := '#[' base attachment point1 point2 ']'
+  base               := symbol | list-of-symbols
+  attachment         := symbol | list-of-symbols
+
+The recursive nature of this grammar is necessary in order to performed
+nested attachment.  In particular, a composite symbol possesses a number
+of components, two of which are the symbol which serves as the base
+(spacing) element of the composite symbol, and the symbol which is
+attached to this base.  Either or both of the base and attaching symbol
+may themselves be a composite symbol, or even a list of symbols, i.e.,
+a sequence of atomic or composite symbols.  These two possibilities are
+shown in the examples shown below, which are specified in a form
+corresponding to the above grammar.
+
+1. '( A CIRCUMFLEX ACUTE ) ->
+      #[ #[ A CIRCUMFLEX TOP TOP ] ACUTE TOP TOP ]
+
+2. '( A CIRCUMFLEX ACUTE ) ->
+      #[ #[ A CIRCUMFLEX TOP TOP ] ACUTE TOP TOP-RIGHT ]
+
+3. '( A ACUTE A TILDE DOUBLE-MACRON ) ->
+      #[ #[ #[ A ACUTE TOP TOP ] #[ A TILDE TOP TOP ] ] DOUBLE-MACRON TOP TOP ]
+  
+The first two examples above represent an A WITH CIRCUMFLEX to which an
+ACUTE is attached.  The only difference between the two is that they
+employ different attachment points.  The use of different attachment points
+is predicated on different orthographies (in different writing systems)
+which apply to the same symbols.
+
+The last example represents an A WITH ACUTE followed by an A WITH TILDE,
+with a DOUBLE-MACRON applied to these two composite symbols.  The result
+would look something like the following:
+
+                                 ____
+                                 '  ~
+                                 A  A
+                                   
+The two attachment point components of a composite symbol specify a given
+point on the attaching symbol to be attached to a given point on the base
+symbol.  These attachment points are further discussed in another paper.

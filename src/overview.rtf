@@ -1,0 +1,245 @@
+{\rtf0\ansi{\fonttbl\f0\fnil Times-Roman;\f1\fmodern Courier;\f2\fmodern Ohlfs;}
+\paperw9840
+\paperh8400
+\margl120
+\margr120
+\pard\tx960\tx1920\tx2880\tx3840\tx4800\tx5760\tx6720\tx7680\tx8640\tx9600\f0\b0\i0\ulnone\fs20\fc0\cf0 \
+
+\b\qc\fs24 Metis Basic Universal Text Library (UTL)\
+Conceptual Overview\
+
+\b0 \
+
+\fs22 April 4, 1993\
+
+\fs24 \
+
+\ql\fs22 1. 
+\ul Introduction
+\ulnone\fs20 \
+\
+The Metis Basic Universal Text Library (tm) (Metis Basic UTL or just Basic UTL) is a software substrate which supports the representation, interchange, and processing of character data encoded with the ISO/IEC 10646 Universal Coded Character Set.  In addition, the entire repertoire and semantics of the Unicode Worldwide Character Encoding, Version 1.1, is supported by the Metis Basic UTL.\
+\
+The Basic UTL is designed to solve the fundamental problems faced in constructing globalized application and system software by providing a highly efficient representation and set of primitives for processing and exchanging fully multilingual textual information.  The Basic UTL can be used by system software such as compilers, database systems, network and directory subsystems, electronic mail and news interchange; and with application software such as text archival and retrieval systems, text indexing systems, and so on.  Due to a highly optimized form of textual representation, any string employed by existing software can potentially be converted into a UTL form which supports the simul- taneous representation of the texts of all written languages.\
+\
+The form used to represent textual information in the Basic UTL is a semi- transparent text object which supports the representation of both content and appearance of textual data.  Textual content is divided into a primary component, represented directly by ISO/IEC 10646 character encodings, and one or more secondary components which can incorporate arbitrary application or user data.  Some examples of secondary content components include language tags, SGML markup, phonetic annotations (e.g., Japanese Rubi), user-specified sorting keys, etc.\
+\
+The explicit representation of textual appearance is supported by means of a hierarchical text style component.  A rich set of builtin style attributes are provided along with a means for arbitrarily extending these builtin styles. The builtin style attributes form a superset of the font and text style attributes specified by ISO 9541 Font and Character Information Interchange and ISO 8613 Office Document Architecture (ODA), and include font family, typeface, point size, set width, color, and texture.\
+\
+The Basic UTL supports a large number of standard string and text encodings by means of a collection of Text Filters.  Different text filter objects provide support for the import and export of a variety of text encodings such as ISO 2022, Extended Unix Code (EUC), DBCS encodings (e.g., Shift JIS), X Compound Text (Xct), and ASN.1 string formats.  A filter object is used to manage the interchange of data between a UTL text object and external text encoding formats, a process which often requires the retention of state information during the interchange process.\
+\
+A rich variety of primitive operations are provided for Basic UTL text objects.  These include standard operations such as the insertion, deletion, and replacement of content and appearance data; common predicate operations such as determining the class of a text element, e.g., whether a text element is a letter, number, symbol, kanji character, hanzi character, etc., determining the script of a text element, determining the language or writing system which applies to a text element; transformation operations such as case folding, kana syllabary shifts (e.g., katakana to hiragana), kana width transformations (e.g., zenkaku to hankaku), etc.; and, sorting and searching operations.\
+\
+Because many types of text processing operations are sensitive to the language or writing system which applies to textual data, the Basic UTL provides a set of objects which encapsulate language and writing system specific information.  These objects include a Script Object, which abstracts information about the symbols provided by a script, and a Writing System Object, which represents the actual use of a script in the context of a particular written language and set of orthographic conventions.  A Script and Writing System database is provided by the Basic UTL which contains the information of a large number of scripts and writing systems as used today.  New scripts and writing systems can be easily added to the database, and accessed by means of the appropriate objects.\
+\
+In addition to the above, the Basic UTL provides two independent components which are commonly used to support localization or internationalization of software:  a text message component, and a cultural defaults component.  A Message Database provides a catalog of messages or string resources which can be used to support both individual and multiple language environments. The interface to this database is by means of a Message Catalog Object which allows for the retrieval of textual information to be used during runtime operations of application and system software.  A second component is a Cultural Defaults Database, which, by means of a Cultural Defaults Object, allows application and system software to determine the cultural preferences of a user so that language or culture specific information can be presented to (or obtained from) the user during program operations.\
+\
+While the Metis Basic UTL provides a rich set of functionality for creating internationalized or localized software, it does not provide all of the functionality necessary for this task.  In particular, it does not directly provide for user input or display of textual data, i.e., the actual user interface for textual data.  The Basic UTL is explicitly designed to support the most common types of text and string processing functions with the exclusion of actual input or presentation of textual data.  This design decision allows the functionality of text processing to be naturally divided into two domains of processing:  those that do not or do require direct user interaction.  Because a significant number of applications are in the former domain, the added functionality of direct user interaction would significantly burden those applications with unused components.\
+\
+The full needs of multilingual text user interfaces will be provided in the near future by additional Metis products.  An advanced library which will provide support for the display, creation, and editing of fully multilingual textual data will utilize the text representation and functionality provided by the Metis Basic UTL.  This will provide a natural migration path for applications which wish to provide full user interface support on top of the Metis Basic UTL.\
+\
+
+\fs22 2. 
+\ul Universal Text Object
+\ulnone \
+
+\fs20 \
+The UTL Text Object is a highly efficient polymorphic object which supports the needs of both very small and simple and very large and complex textual data.  In its simplest form, it consumes only 2 bytes of memory for a zero length text object.  This is equivalent to the requirements of a zero length NULL terminated 16-bit wide character string such as an ISO/IEC 10646 UCS2 string.\
+\
+The UTL Text Object supports both UCS2 and UCS4 forms of ISO/IEC 10646 encodings for the representation of primary content information.  The UCS4 form is automatically used when an Extended UCS2 encoding is used. [Extended UCS2 is an extension technique recently proposed by ANSI X3L2 to ISO JTC1/SC2/WG2 which provides for a way to interchange limited data from the UCS4 encoding space without having to interchange UCS4 encodings directly.  The Basic UTL support for Extended UCS2 is subject to change according to the decisions of ISO JTC1/SC2/WG2.]\
+\
+Secondary content and appearance data is represented in a UTL Text Object by maintaining a parallel data structure known as an annotation structure. Annotations may be applied to primary content in two ways:  (1) by specifying a single index to which the annotation is attached, or (2) by specifying both starting and ending indices for the annotation.  The former type of annotations are known as Marker Annotations; the latter are known as Interval Annotations.  The indices used to specify annotations are in terms of the indexing mode of the text object, which can either be according to character code elements (codepoints) or character text elements (sequences of code elements, interpreted as larger units according to the writing system which applies to the text).  Annotation indices are automatically updated when certain operations occur on a text object, such as the insertion or deletion of primary content; that is, once an annotation is made to some component of primary content, it will automatically follow that content when it moves due to insertion and deletion operations.\
+\
+Every annotation is typed, and may possess an optional name and optional data.  Optional annotation data is incorporated directly into a text object; however, a mechanism for storing pointers in annotations is also provided.  When a text object with pointer annotations is serialized, the data to which the pointer refers must be serialized also.  For this reason, the use of annotations with embedded pointers requires that an application register both Annotation Encoding and Decoding functions to be used in these cases.\
+\
+Two different orthogonal types of text object representations are provided by the Basic UTL:  (1) small and large, and (2) contiguous and non-contiguous. Any text object which contains fewer than a certain number of character code elements (by default, 1024) are considered to be small text objects, and those with more code elements as large text objects.  For each of these sizes of objects is provided both a contiguous and a non-contiguous form. Contiguous text objects are essentially a serialized object which nevertheless provides both access and modification support.  The contiguous form of text objects is useful for memory mapping a text object from a file or from another address space.  The non-contiguous form is provided for greater efficiency during modification operations where certain components of a text object may require reallocation of memory resources.\
+\
+UTL Text Objects normally manage their own memory resources.  This allows insertion or replacement of content and annotations to operate automatically without the need for application memory allocation or reallocation.  However, an application may manage text object memory directly by registering certain functions (or by subclassing).  In addition, an application may mark a text object as read-only, both on a global basis (i.e., the entire text object), or by annotations (thus allowing specific intervals of content to be treated as read-only).  Annotations themselves may also be marked as read-only.\
+\
+A number of builtin annotations are used by the Basic UTL to provide support for advanced features.  The most important builtin annotation is a writing system annotation which allows an interval of primary content to be explicitly tagged as representing the data of a certain writing system.  [A writing system encompasses both the language which the text represents and the orthography which applies to its written form.]  The use of writing system annotations allows for the full use of ISO/IEC 10646 character data which may require language or writing system specific processing, such as spell checkers, default font selection, etc.  Other builtin annotations include the means for specifying hyphenation points, formatting boundaries (e.g., line and page breaks), phonetic annotations (Japanese Rubi), sort keys, etc.\
+\
+A text object is accessed according to an indexing mode which applies to the text object as a whole.  Two indexing modes are currently provided: (1) indexing by code element (codepoint), and (2) indexing by text element. When the latter indexing mode is chosen, operations which reference indexes will operate on entire text elements (sequences of code elements) according to the natural text elements of a writing system.  In order to interpret text elements according to writing system, a text must be annotated according to the writing systems it employs.  Each text object is also provided a default writing system attribute, which applies in the absence of explicit writing system annotations.  If a writing system annotation is not specified for a given portion of primary content, or if the default writing system is unspecified or doesn't apply (e.g., because it applies to a different script), then indexing by text element defaults to indexing by code element.\
+\
+An added benefit of writing system annotations is that it allows the enforcement of certain constraints on how the textual content it governs is encoded.  See the section "Writing System Object" below for further information.\
+\
+The UTL text object is normally an opaque structure which is not visible to the application and system software using it.  However, in order to support high performance uses of the text object, a semi-transparent mode is provided.  By using UTL API functions (or methods), a pointer into the primary content portion of the text object can be obtained.  When obtaining such a pointer, the UTL client must specify start and end indices and an access mode flag which specifies whether access will be by UCS2 or UCS4 encoding forms.  If a UCS2 access mode flag is specified for a text object which is using UCS4 encodings internally, then the UCS4 data in the specified access interval will be temporarily translated into UCS2 form.  In this case, a special mechanism is provided for translating UCS4 code elements which fall outside the UCS2 (BMP) encoding space. When a UCS4 code element outside the BMP is encountered, it is translated to a user defined code element which is dynamically allocated for this purpose.  If insufficient space is available to dynamically allocate user defined code elements, then access is not allowed in UCS2 form; rather, UCS4 access mode must be used.  After a UTL client (i.e., the application or system software using UTL) has completed transparent mode access, it must make another UTL API call in order to terminate the semi-transparent mode of the text object.\
+\
+By using the UTL text object's semi-transparent mode, a UTL client may perform efficient iterative operations on the code elements of a text object.  For example, an application that wished to count all SMILING FACE characters (UCS2 0x263A and 0x263B) could access a text object as follows:\
+\
+
+\fs22 Semi-Transparent Mode Example
+\fs20 \
+\
+
+\f1     int\
+      count_smileys ( UTText t )\
+    \{\
+      register UCS2 *p, *ep;\
+      unsigned long nc;\
+      int nsmileys = 0;\
+\
+      p = (UCS2 *)\
+	UTBeginTransparentMode ( t, 0, UTLength ( t ), UCS2_MODE, & nc );\
+      if ( ! p )\
+	return -1;\
+      for ( ep = & p [ nc ]; p < ep; p++ )\
+	if ( ( *p == 0x263a ) || ( *p == 0x263b ) )\
+	  nsmileys++;\
+      UTEndTransparentMode ( t );\
+      return nsmileys;\
+    \}\
+
+\f0 \
+When a text object is operating in semi-transparent mode, all UTL APIs which access or modify a text object are temporarily disabled until the semi- transparent mode has been terminated.  In the above example, a call to UTBeginTansparentMode is used to initiate semi-transparent operations.  This function returns a point to the beginning of the requested interval.  In this case, the interval spans the entire text object.  If a NULL pointer is returned, then the UCS2_MODE could not be accommodated due to the presence of untranslatable UCS4 encodings, i.e., not enough dynamically allocatable user defined space in the BMP was available to translate all non-BMP UCS4 encodings.\
+\
+
+\fs22 3. 
+\ul Text Filter Object
+\ulnone\fs20 \
+\
+String and textual information can be imported from and exported to a variety of external formats.  All primary content data in a UTL Text Object is represented by means of ISO/IEC 10646 encodings; however, a large variety of other coded character sets and string encodings are supported by the Metis Basic UTL.  These include ISO 2022 7-bit and 8-bit encodings, mixed SBCS (Single Byte Character Set) and DBCS (Double Byte Character Set) strings (e.g., ASCII + Shift JIS, ASCII + BIG5, etc.), Extended Unix Codes, ISO 6937 encoded strings, X Compound Text (ISO 2022 with extensions), UCS Transformation Formats (UTF-1 and UTF-2), and ASN.1 string encodings.\
+\
+Filters for Microsoft RTF (Rich Text Format), SGML, and ODA Character Content formats are expected to be available in the near future.  The import and export of these formats will make use of the UTL Text Object annotation subsystem in order to store secondary content (e.g., SGML element tags, names and attributes), and appearance information (e.g., RTF style data and ODA character attributes).\
+\
+
+\fs22 4. 
+\ul Script Object
+\ulnone\fs20 \
+\
+The Metis UTL provides a database of Script information which defines the graphical symbols of a script, the formal properties of a script's graphical symbols and the script as a whole, and a default ordering of a script's symbols which is used when collating textual data that is not tagged according to writing system, or when a script specific sort is to occur.\
+\
+The database includes information for approximately 40 modern scripts used in the world today.  Other scripts can be easily added to the database by means of a script database tool.\
+\
+
+\fs22 5. 
+\ul Writing System Object
+\ulnone\fs20 \
+\
+Many operations on textual data are sensitive to the language the data represents.  Because character encodings do not in general distinguish among different written language's use of the same symbol, it is difficult or impossible to perform certain operations unless the data is tagged according to its writing system.  The Metis Basic UTL provides a means to tag the writing system of any portion of a text object's primary content.\
+\
+The information about particular writing systems is stored in a writing system database, and is accessed by means of writing system objects.  These objects allow each writing system to enumerate the scripts and symbols of scripts which it employs, the text elements and functional values of its use of these symbols, and the ordering classes and ordering weights of its text elements.  Other information which a writing system object can provide include information about hyphenation, word breaking, spelling, and other types of language sensitive information.\
+\
+Because the numbers of writing systems vastly exceeds the number of scripts in the world, only a small number of writing systems are provided by the Metis Basic UTL.  In general, at least one writing system is specified for each script.  However, a number of scripts, such as the Latin, Cyrillic, and Arabic scripts, are used by hundreds of writing systems.  New writing systems may be easily specified by using a writing system database tool.\
+\
+
+\fs22 6. 
+\ul Message Catalog Object
+\ulnone\fs20 \
+\
+The Metis Basic UTL provides an independent subsystem which makes use of the UTL Text Object subsystem in order to support localized message catalogs.  A system-independent API provides a highly portable means of obtaining and formatting messages for presentation to a user.  The Metis UTL Message Catalog Object provides a convenient way to abstract the various message catalogs currently provided on different platforms.  The Message Catalog Object makes used of any native message catalog system; in addition, it provides a mechanism for extending existing message systems for multilingual environments by allowing writing system and rich text annotations to be specified on top of existing plain text messages. This is accomplished by using a feature of the UTL Text Object which allows the primary content of the object to be fetched on demand from an external source.  The annotations mechanism of the UTL Text Object may be used to specify the writing system and appearance of text content which is, in essence, lazily evaluated (in this case fetched through a filter). This allows the native systems message system to continue to provide the content of messages, while extending their specification (e.g., according to language and appearance, i.e., formatting) by means of text annotations.\
+\
+
+\fs22 7. 
+\ul Cultural Defaults Object
+\ulnone\fs20 \
+\
+During the operation of a software system, certain aspects of culture may need to be taken into account in order to correctly perform an operation. Common examples include the formatting of numbers, dates, times, etc.  This cultural information is often specific to a system as a whole; however, some types of information may need to be determined by particular users.  A single user may also wish to make certain cultural choices in one instance, but another choice in a different instance.  In order to manage this type of cultural default information, the Basic UTL provides a hierarchical cultural default database.  The different levels of the hierarchy allow default choices to be made on a system-wide basis, on an application-wide basis, on a per-user basis, and on a per-user-session basis.\
+\
+A cultural defaults object provides the abstract data and interface to the cultural defaults database.  This object is designed to make use of certain information provided by existing LOCALE systems when they are available. However, unlike LOCALE systems, the cultural defaults object clearly distinguishes between information which depends on the system, program, and user (session information), and information which depends on the data being processed (e.g., character encoding of textual data, language or writing system of textual data, etc., i.e., data information).  In the absence of other information, some components of the Basic UTL do make use of LOCALE data-sensitive information such as default encoding format. However, this is an exception rather than the rule.\
+\
+Multiple cultural defaults objects may be employed.  This supports the implementation of server subsystems which interact with remote clients, each of which may wish to specify different cultural default information.\
+\
+
+\fs22 8.
+\ul  Implementation Information
+\ulnone\fs20 \
+\
+The Basic UTL is implemented in standard ANSI C language.  Three API sets are provided for C, C++, and Objective-C environments.  The Basic UTL will be initially available for UNIX (r), NeXTSTEP (r), and Microsoft Windows NT (r) environments.\
+\
+For C environments, certain UTL APIs are provided in pairs.  One member of the pair takes as an argument a pointer to the object on which it is to perform an operation and returns a pointer to the same object or possibly to a reallocated object.  The second member of the pair of APIs takes a handle for (or a pointer to a pointer of) the object as an argument and returns an error status code.  In the first case, an error status code is returned indirectly by means of an API call.  An error condition is indicated by means of a NULL returned pointer.  The following examples indicate the usages of these two pairs.\
+\
+
+\fs22 Example 1 - Text Object Pointers in C
+\fs20 \
+\
+
+\f1     UCTextPtr UTInsertContentPtr ( UCTextPtr, ... );\
+\
+    \{\
+      UCTextPtr tp;\
+      UTStatus status;\
+\
+      if ( ! ( tp = UTInsertContentPtr ( tp, ... ) ) ) \{\
+	status = UTGetError ( );\
+	goto err;\
+      \}\
+\
+    \}\
+
+\f0 \
+
+\fs22 Example 2 - Text Object Handles in C
+\fs20 \
+\
+
+\f1     UTStatus  UTInsertContent ( UCText,  ... );\
+\
+    \{\
+      UCText t;\
+      UTStatus status;\
+\
+      if ( ! ( status = UTInsertContent ( t, ... ) ) )\
+	goto err;\
+\
+    \}\
+
+\f0 \
+The APIs which come in pairs like this are those which may require reallocation of an object during the operation.  For example, the functions UTInsertContent and UTDeleteContent both may require reallocation of a UTL text object.  [The delete operation may require reallocation in order to create a gap buffer in a text object which has no gap buffer.]  The name of the first pair of the APIs is always that of the second pair with the suffix "Ptr" added.\
+\
+The use of pointers to objects is provided in order to fully optimize the memory requirements for very small text objects.  If an ungapped small (UCS2) text object has only a single code element then it is only 4 bytes in length (2 bytes header, 2 bytes for single UCS2 code element). Since handles require the UTL to store an additional 4-byte pointer, the use of handles would force each such small text object to use 8 bytes when only 4 bytes will suffice.  However, the use of pointers to text objects require that extra care be taken in order to use the returned pointer for all future references.  Failure to do so may cause serious problems if a reference is made to a text object pointer whose memory has been deallocated, or, even worse, deallocated and then reallocated and reused.\
+\
+Because the use of pointers to text objects requires special care and special processing for error status indications, the name of each API which takes a pointer to an object is marked with the special "Ptr" suffix.  A further restriction which is placed on "Ptr" APIs is that the UTL assumes that the pointer points at locked memory.  On certain systems (Microsoft Windows and the Macintosh), unlocked pointers should never be given to UTL "Ptr" functions.\
+\
+For C++ and Objective-C APIs, no such "Ptr" API duality is employed.  All objects (instances) which may exhibit the above behavior use embedded pointers to reallocatable memory.  For example, the following examples do not require special care for reasons of memory reallocation which occurs in the implementation of the text object class.\
+\
+
+\fs22 Example 3 - Text Object in C++
+\fs20 \
+\
+
+\f1     // UTText.h\
+    class UTText \{\
+     private:\
+      Pointer	ptr;      // pointer to struct UTTextRec\
+     public:\
+      UCText();\
+      UCText(const char *text);\
+     ~UCText();\
+      ...\
+    \};\
+\
+    // code fragment\
+    \{\
+      UTText *t = new UCText ( "testing" );\
+      t->insertAt ( t->length ( ), " one two three" );	// simulate append\
+    \}\
+
+\f0 \
+
+\fs22 Example 4 - Text Object in Objective-C
+\fs20 \
+\
+
+\f1     // UTText.h\
+    @interface UTText : Object\
+    \{\
+      Pointer	ptr;      // pointer to struct UTTextRec\
+    \}\
+    - initText: (const char *) text;\
+      ...\
+    @end\
+\
+    // code fragment\
+    \{\
+      UTText *t = [[UTText alloc] initText: "testing"];\
+      [t insertAt: [t length] text: " one two three"]	// simulate append\
+    \}\
+
+\f0 \
+
+\fs22 9. 
+\ul Availability
+\ulnone\fs20 \
+\
+Contact Metis Technology, Inc., 358 Windsor Street, Cambridge, MA  02141, (617) 868-8010, fax (617) 868-8089, or by email <basic-utl-info@metis.com>. 
+}

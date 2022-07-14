@@ -1,0 +1,710 @@
+
+Title:        Multilingual Rendering & Layout System
+Version:      -- unassigned --
+Author:       Glenn Adams, Metis Technology, Inc.
+Created:      05/03/93
+Last Revised: Tue May 11, 1993 at 20:23:54
+Revised by:   Glenn Adams
+Access:       Metis Confidential
+Status:       Draft In Progress
+
+1.0     INTRODUCTION
+
+This document describes an architecture for and specifies the details of
+a multilingual rendering and layout subsystem.  This subsystem is designed
+to interoperate in the context of the Stonehand Composition Toolbox; however,
+it is not strictly limited to that environment.
+
+The overall functional goals of this subsystem are to provide the necessary
+framework in which to perform high-quality typographic composition and
+presentation of texts representing all modern written languages.  The
+written languages supported by the first version of this system shall be
+languages of the European Community written in Latin script, the primary
+Slavic languages written in Cyrillic script (Russian, Byelorussian, Ukrainian,
+Bulgarian, Serbian, Macedonian), modern Greek (monotoniko), Hebrew, Arabic,
+Chinese, Japanese, and Korean.  At least one Indic script may be supported
+by the initial version (Thai); other Indic scripts will be supported in a
+future version without requiring any modifications to the subsystem
+architecture or implementation.
+
+2.0     ARCHITECTURE
+
+This section introduces the overall architecture of the rendering and layout
+subsystem ("the subsystem").  Each of the primary components of the subsystem
+are described in terms of their functional role and of their overall relations
+with other components.  Before doing this, the architectural impact of script
+and writing system dependencies will be discussed.
+
+2.1     SCRIPT AND WRITING SYSTEM DEPENDENCIES
+
+Many systems have been developed for supporting particular scripts and/or
+writing systems.  Sometimes these systems are extended to support additional
+scripts or writing systems.  A common characteristic of these systems is
+that information which depends on particular scripts or writing systems is
+frequently expressed in a procedural manner.  Sometimes these procedures are
+abstracted so as to allow the invocation of different procedures when
+processing data representing different scripts and/or writing systems.  In
+most cases,  however, procedural information is conditionally compiled in
+a way that merges its functionality into existing procedures.  Both of these
+techniques present serious difficulties for (1) extending a system to support
+new scripts and/or writing systems, and (2) maintaining a system in the face
+of conditional or subdivided functionality.  A more preferable technique to
+the encoding of script and writing system dependent behavior is to use
+declarative information in order to implement a data-driven form of script
+and writing system dependent processing.  By removing these dependencies
+on particular scripts or writing systems a system naturally becomes more
+maintainable and extensible.
+
+A recent significant advance in the development of declarative models of
+script and writing system dependent information is Apple's development of
+the TrueType GX Font Format.  This font format provide a means for
+expressing in a declarative fashion the important script and writing
+system dependencies of display processing.  However, even here there is
+a certain amount of poor architecture.  In particular, this technique of
+isolating script and writing system behavior is focused on the development
+of font resources.  Because these dependencies are tied to specific fonts,
+Apple has not yet strictly isolated this data to specific scripts or
+writing systems, independently of where this information is used.  This
+becomes apparent when multiple TrueType GX fonts embed essentially the
+information in order to describe script dependent behavior.  A second
+deficiency in the TrueType GX mechanism is that it does not support the
+isolation of writing system dependent behavior.  That is, a single script
+shared by multiple writing systems may exhibit distinct display (and
+input) behavior in ithe contexts of different writing systems.
+
+In this subsystem, extensions will be provided to TrueType GX fonts to
+allow writing system dependent processing of textual data expressed with
+the same script.  A separate script and writing system database facility
+will be used to abstract general script and writing system dependent
+information.  This information may be overridden by information specified
+in particular TrueType GX fonts; however, in the absence of TrueType GX
+font data, e.g., when normal TrueType or PostScript fonts are being
+employed, this database will provide key script and writing system
+dependent information that is otherwise not provided by these fonts.
+
+2.2     FORMATTING AND PRESENTATION PIPELINE
+
+The process of rendering and layou is the transformation of character content
+into a form representing the visual depiction of that content.  This process
+is traditionally understood as "formatting" character content for display
+purposes.  The singular notion of "formatting" is here divided into two
+relatively independent sub-processes:  (1) the process of selecting glyphs
+from fonts with which to depict character content; and (2) the process of
+assigning positions to such glyphs for presentation purposes.  These two
+phases of formatting are hereafter referred to as "rendering" and "layout",
+respectively.  The additional process of "presentation" can be viewed as a
+third sub-process if formatting occurs with simultaneous display of the
+formatted results.  The relationship of these components can be expressed
+in terms of a processing pipeline as follows:
+
+
+                              Characters plus
+                             Style Information
+
+                                     |
+                                     |
+                                     V
+                              ----------------
+                             |                |
+                             |   Rendering    |
+                             |                |
+                              ----------------
+                                     |
+                                     |
+                                     V
+                              ----------------
+                             |                |
+                             |     Layout     |
+                             |                |
+                              ----------------
+                                     |
+                                     |
+                                     V
+                              ----------------
+                             |                |
+                             |  Presentation  |
+                             |                |
+                              ----------------
+                                     |
+                                     |
+                                     V
+
+                              Displayed Glyphs
+
+
+The division of formatting and presentation processing into independent
+stages of a continuous processing pipeline enables high-performance
+multiple-threaded implementations of the subsystem in environments where
+multiple CPUs are present.  Because of this goal, it is very important
+that the processing stages represent a unidirectional data flow model.
+This model will occassionally require the generation of redundant data
+in order to satisfy unidirectionality.
+
+2.4     FORMATTING PIPELINE
+
+In a formatting process where presentation does not actually occur, this
+pipeline can be abbreviated to the following:
+
+
+                              Characters plus
+                             Style Information
+
+                                     |
+                                     |
+                                     V
+                              ----------------
+                             |                |
+                             |   Rendering    |
+                             |                |
+                              ----------------
+                                     |
+                                     |
+                                     V
+                              ----------------
+                             |                |
+                             |     Layout     |
+                             |                |
+                              ----------------
+                                     |
+                                     |
+                                     V
+
+                             Positioned Glyphs
+
+
+In this format-only processing, the output of the pipeline is a portion of
+what is commonly known as a "final form document".  This form of a document
+is suitable for input to a presentation process, e.g., a PostScript file which
+can be submitted to in a PostScript printer or a Display PostScript system.
+Since this subsystem only addresses the formatting of textual content, other
+components of a final form document may be generated by other formatting
+processes, e.g., those processes concerned with imaging pictures or graphical
+information.
+
+2.5     FONT RESOURCES
+
+Each component of the processing pipelines described above must have access
+to certain data associated with fonts.  This data is collected in a software
+component known as a "font resource".  The types of information required from
+this resource by the formatting and presentation pipeline is as follows:
+
+                ----------------
+               |                |  Glyph Selection Data
+               |   Rendering    |<---------------------
+               |                |                      |
+                ----------------                       |
+                                                       |
+                                                       |
+                                                       |
+                ----------------   Glyph        ----------------
+               |                |  Metrics     |                |
+               |     Layout     |<-------------| Font Resource  |
+               |                |              |                |
+                ----------------                ----------------
+                                                       |
+                                                       |
+                                                       |
+                ----------------                       |
+               |                |  Glyph Outlines      |
+               |  Presentation  |<---------------------
+               |                |
+                ----------------
+
+The processing requirements of the pipeline components are such that the
+types of data provided by a font resource can be cleanly partitioned into
+the separate components needed by each stage of the pipeline.  In particular,
+the rendering stage should not need access to glyph metric information or
+glyph outlines (or bitmaps); rather, it should only need access to information
+that allows it to select the appropriate glyph to be displayed.  Similarly,
+the layout stage should not need access to either glyph selection or glyph
+outline (image) data.  Under ideal circumstances, this separation of font
+data is readily attained; however, in certain circumstances, such a clean
+separation fails.  In particular, glyph selection is occasionally sensitive
+to line break boundaries (German ff/fff, Nordic ll/lll).  In addition, in
+certain cases, glyph selection may be sensitive to justification requirements
+(Arabic).  These cases may be handled in one of two ways:  (1) by deferring
+certain glyph selections to the layout stage; or (2) by allowing the layout
+stage to iteratively invoke the rendering stage in order to re-render glyphs.
+In this system, the second alternative is ruled out because it creates a
+loop between the rendering and layout stages, effectively removing the
+possibility of a pure processing pipeline.  Instead, the technique of deferred
+glyph selection is utilized in only those cases where further selection
+decisions are possible.
+
+The subsystem components interact with the font resource(s) by means of
+a font interface layer.  This layer provides an abstraction barrier to
+the subsystem from specific font resource formats.  This layer shall provide
+enough functionality to adequately support full use of TrueType GX font formats
+and ISO/IEC 9541 Font Resource formats (a superset of PostScript Type 1 +
+Adobe Font Metric Data).
+
+2.5.1   TRUETYPE GX FONTS
+
+The subsystem shall support the direct use of TrueType GX Fonts.  Two
+types of information present in TrueType GX fonts shall be utilized.
+The first is glyph metamorphosis data to be used during glyph selection
+processing; the second is glyph metric data to be used during glyph
+layout processing.  The latter consists of the horizontal and vertical
+metric, baseline, justification, pair kerning, and track kerning tables.
+In addition, other tables, such as the caret ligature table, may be
+utilized to support the needs of interactive editing.
+
+2.5.2   TRUETYPE GX FONT EXTENSIONS
+
+A number of additional font resource components are required for supporting
+the full needs of the subsystem.  The most important of these are a glyph
+complement table, a diacritic (accent) attachment table, and a glyph template
+table.  None of these are currently defined by TrueType GX.  The subsystem
+shall provide a mechanism for creating and extracting extensions to the
+currently (Apple) defined set of TT GX tables in order to support these
+additional tables.  In the absence of these extended tables, the subsystem
+shall provide default behavior to the extent that this is possible.
+
+2.5.3   ISO/IEC 9541 FONT RESOURCES
+
+2.5.4   ISO/IEC 9541 FONT RESOURCE EXTENSIONS
+
+3.0     INTERFACES
+
+Three primary external interfaces are provided by the subsystem.  These
+correspond to the three stages of the overall formatting and presentation
+pipeline as depicted in section 2.2.  Each interface is implemented in
+such a way that all global information is referenced through an environment
+object, where shared elements of the environment implement appropriate
+synchronization protocols.  This ensures that each stage of the pipeline
+can be implemented in a separate thread in order to provide maximum
+efficiency on multiple processor systems.
+
+3.1     RENDER TEXT
+
+The first stage in the processing pipeline is responsible for transforming
+text represented by character data into a displayable form represented
+by glyph data.  This stage is implemented by the RENDER TEXT module.  This
+module shall accept character content along with style information which
+applies to this content and shall produce a logical glyph stream which
+represents the displayable form of the input.  This displayable form
+may undergo additional processing in subsequent processing stages.  Under
+normal circumstances, the next processing stage will accept this displayable
+form and perform layout (formatting) processing  in order to assign positions
+to each glyph according to layout requirements.  These positions shall be
+assigned in a device independent coordinate space which is defined by
+the application.  The following diagram depicts this processing stage:
+
+                              Characters plus
+                             Style Information
+
+                                     |
+                                     |
+                                     V
+                              ----------------
+                             |                |
+                             |  Render Text   |
+                             |                |
+                              ----------------
+                                     |
+                                     |
+                                     V
+
+                               Logical Glyph
+                                  Stream
+
+The input character content and associated style information shall be in the
+form of a Metis Universal Text Object.  The content to be rendered shall
+be indicated with a starting and ending character offset; the style
+information associated with the content shall implicitly obtained by
+means of Style Annotations on this content.  In addition, any explicit
+writing system tags which apply to the content shall be implicitly obtained
+by means of Writing System Annotations.  A Defaults Annotation is expected
+to provide the following additional information:  default writing system
+(language & orthography) and default style.
+
+3.1.1   EXPLICIT INPUT PARAMETERS
+
+  (1) environment object
+  (2) font catalog object
+  (3) style catalog object
+  (3) text object
+  (4) global rendering parameter object
+
+3.1.2   IMPLICIT INPUT PARAMETERS
+
+  From environment object:
+
+  (1) ISO/IEC 10646 character attribute database
+  (2) writing system database
+  (3) script database
+  (4) global caches (TBD)
+
+  From font catalog object:
+
+  (1) font identifier map (font style specification -> font identifier)
+  (2) font attachment label identifiers map
+  (3) font glyph complements
+  (4) font variations tables*
+  (5) font descriptors tables*
+  (6) font feature name tables*
+  (7) font glyph metamorphosis tables*
+  (8) glyph properties tables*
+
+  *From TrueType GX
+
+  From text object:
+
+  (1) cached logical glyph stream object
+  (2) character content
+  (3) default writing system
+  (4) default style
+  (5) explicit writing system runs
+  (6) explicit style runs
+  (7) cached break point candidates
+
+3.1.3   OUTPUT PARAMETERS
+
+  (1) logical glyph stream object
+
+3.2     LAYOUT GLYPHS
+
+Issues:
+
+  1. tabbing environments
+  2. 
+
+                               Logical Glyph
+                                  Stream
+
+                                     |
+                                     |
+                                     V
+                              ----------------
+                             |                |
+                             |     Layout     |
+                             |                |
+                              ----------------
+                                     |
+                                     |
+                                     V
+
+                               Glyph Drawing
+                                  Stream
+
+Explicit Input Parameters:
+
+  1. environment object
+  2. font catalog object
+  3. column list
+  4. logical glyph stream object
+
+Implicit Input Parameters:
+
+  NONE
+
+Output Parameters:
+
+  1. line list, where each line is bound to a distinct
+     physical glyph stream object
+  2. font reference list
+
+3.3     DRAW GLYPHS
+
+                               Glyph Drawing
+                                  Stream
+
+                                     |
+                                     |
+                                     V
+                              ----------------
+                             |                |
+                             |  Presentation  |
+                             |                |
+                              ----------------
+                                     |
+                                     |
+                                     V
+
+                             [Displayed Glyphs]
+
+Explicit Input Parameters:
+
+  1. environment object
+  3. device object
+  3. device layout region object
+  4. device matrix object
+  5. physical glyph stream object
+
+Implicit Input Parameters:
+
+  NONE
+
+Output Parameters:
+
+  NONE
+
+4.0     DATA FORMATS
+
+4.1     LOGICAL GLYPH STREAM
+
+The logical glyph stream is the form of data output by the first
+processing stage (rendering).  It represents a logical sequence of
+local glyph identifiers within the context of particular font
+resources.  Embedded in this stream are data pertaining to font
+selection, visual display attribute selection (e.g., color, under-
+lining, etc.), alternate glyph selections, break point candidates,
+directional shifts, and inverse glyph to character offset mappings.
+Some of these data are meant to be passed directly through to the
+subsequent (layout) processing stage, such as visual display attribute
+selection and glyph to character offset mappings.  The remaining
+data are consumed, utilized, or possibly modified by the layout
+processing stage.  The semantics of each component of the logical
+glyph stream is specified below.  The form of the logical glyph stream
+is an opcode/operand instruction stream, where each opcode/operand
+occupies a 32-bit element.  Certain opcodes employ additional
+operands following the initial instruction.
+
+4.1.1   LOGICAL GLYPH STREAM FORMAT
+
+The basic form of each element of the logical glyph stream is an
+instruction which uses the following structure:
+
+
+         31     24 23                         00
+         _______________________________________
+        |         |                             |
+        |   OP    |       IMMED OPERAND         |
+        |_________|_____________________________|
+
+
+Additional operands may follow the first instruction, such as follows:
+
+         31     24 23                         00
+         _______________________________________
+        |         |                             |
+        |   OP    |       IMMED OPERAND         |
+        |_________|_____________________________|
+        |                                       |
+        |          EXTENDED OPERAND #1          |
+        |_______________________________________|
+                           .
+                           .
+                           .
+         _______________________________________
+        |                                       |
+        |          EXTENDED OPERAND #N          |
+        |_______________________________________|
+
+
+4.1.1.1 SET FONT (00h)
+
+Set the current font to the font indicated by FONT IDENTIFIER.  This
+identifier is a 16-bit unsigned integer which is assigned by a font
+catalog object to some font resource in the catalog.  Different
+catalogs may use different font identifiers for the same physical
+font resource; therefore, an identifier is only valid in relation
+to a particular font catalog.
+
+         31     24 23     16 15               00
+         _______________________________________
+        |         |         |                   |
+        |   00h   |   MBZ   |  FONT IDENTIFIER  |
+        |_________|_________|___________________|
+
+
+4.1.1.2 SET TEXT OFFSET (01h)
+
+Set the current text offset to ( TEXT OFFSET << 8 ).  The current text offset
+is used to compute the mapping from a glyph to a character which
+generated the glyph.  The exact offset is determined by adding this
+offset to the character index field associated with the glyph.
+
+         31     24 23                         00
+         _______________________________________
+        |         |                             |
+        |   01h   |         TEXT OFFSET         |
+        |_________|_____________________________|
+
+
+4.1.1.3 SET DISPLAY ATTRIBUTE (02h)
+
+Set the display attribute of type ATYPE to the value AVALUE.  The
+valid types are indicated below.
+
+         31     24 23     16 15               00
+         _______________________________________
+        |         |         |                   |
+        |   02h   |  ATYPE  |      AVALUE       |
+        |_________|_________|___________________|
+
+
+        ATTRIBUTE TYPES         DESCRIPTION
+
+              0                 Reset attributes to device default
+              1                 Background Color
+              2                 Foreground Color
+              3                 Background Texture
+              4                 Foreground Texture
+              5                 Striking Mode
+              6                 Underline Mode
+              7                 Inverted Mode
+              8                 Blinking Mode
+              9                 Blanked Mode
+
+The intention of this instruction is to pass thru visual text attributes
+which are specified in the text object's style annotations to the layout
+processing stage, which, in turn incorporates them into the resulting
+glyph drawing stream.  In general, these attributes will be ignored by
+the layout processing stage.  However, some of them, particularly the
+striking and underline modes may be used during layout processing in order
+to recompute bounding boxes for glyphs so that striking lines and under
+lines are accounted for.
+
+4.1.1.4 PUSH DIRECTION (03h)
+
+Push the direction DIR onto the top of the directional flow stack.
+The defined values of DIR are specified below.
+
+         31     24 23                  07     00
+         _______________________________________
+        |         |                   |         |
+        |   03h   |        MBZ        |   DIR   |
+        |_________|___________________|_________|
+
+
+             DIR                DESCRIPTION
+
+              0                 Left to right
+              1                 Right to left
+              2                 Top to bottom
+              3                 Bottom to top
+              4                 Horizontal boustrophedon
+              5                 Vertical boustrophedon
+
+4.1.1.5 POP DIRECTION (04h)
+
+Pop the last CNT directional shifts from the directional flow stack.
+If CNT is zero, then clear the directional flow stack (i.e., reset
+it to default device directional flow).  Under normal circumstances,
+CNT will be 01h.
+
+         31     24 23               08 07     00
+         _______________________________________
+        |         |                   |         |
+        |   04h   |        MBZ        |   CNT   |
+        |_________|___________________|_________|
+
+
+4.1.1.6 SET GLUE (05h)
+
+Set glue into current layout region.  The glue is characterized by
+the values of SPACE, STRETCH, and SHRINK, each of which are unsigned
+integers.  A value of FFh in either stretch or shrink fields is
+interpreted as an infinite amount of stretching or shrinking.
+
+         31     24 23     16 15     08 07     00
+         _______________________________________
+        |         |         |         |         |
+        |   05h   |  SPACE  | STRETCH | SHRINK  |
+        |_________|_________|_________|_________|
+
+
+[Questions:  (1) what units should be used? (2) are 8 bits enough for
+each value? (3) should there be different "grades of infinity"?]
+
+4.1.1.7 SET BASE GLYPH (80h - 9Fh)
+
+Set the base (non-combining) glyph indicated by GLYPH IDENTIFIER into
+the current layout region.  This identifier is a local identifier
+expressed in relation to the current font.  This glyph was generated
+from the NC character(s) starting at index ( current text offset + CHIDX )
+of the text object being rendered.
+
+         31     24 23     16 15               00
+         _______________________________________
+        |    |    |         |                   |
+        |100X| NC |  CHIDX  |  GLYPH IDENTIFIER |
+        |____|____|_________|___________________|
+
+
+If NC == 0, then this glyph was generated by a discontiguous sequence
+of characters.  In this case, CHIDX indicates the number of character
+indexes which are packed into subsequent extended operands.  The form
+of these extended operands are as follows:
+
+         31     24 23     16 15     08 07     00
+         _______________________________________
+        |         |         |         |         |
+        | CHIDX 0 | CHIDX 1 | CHIDX 2 | CHIDX 3 |
+        |_________|_________|_________|_________|
+        |         |         |         |         |
+        | CHIDX 4 | CHIDX 5 | CHIDX 6 | CHIDX 7 |
+        |_________|_________|_________|_________|
+                           .
+                           .
+                           .
+         _______________________________________
+        |         |         |         |         |
+        | CHIDX N |   MBZ   |   MBZ   |   MBZ   |
+        |_________|_________|_________|_________|
+
+
+The final extended operand is padded out with zeroes in unused index
+fields.  Since each of these indexes are added to the current text
+offset, it may be necessary, depending on the number of indexes, to
+set the current text offset just prior to an instruction which contains
+a large number of discontiguous character indexes; otherwise, there is
+a danger that an index field might overflow if the discongiuity is
+large.  In any case, the discontiguity may be no larger than the maximum
+value of an index field; namely, 255.
+
+In this instruction, bit 28, marked with an 'X' in the above diagram,
+is used to specify whether a line break may occur after this base glyph
+or not.  If bit 28 is one, then a break may occur; otherwise, it may
+not.
+
+4.1.1.8 SET ATTACHED GLYPH (A0h - AFh)
+
+Set the attaching (combining) glyph indicated by GLYPH IDENTIFIER into
+the current layout region.  This glyph is to be attached to the most
+recent base glyph such that the reference point associated with SRC
+LABEL in the attaching glyph's coordinate space is aligned with the
+reference point associated with DST LABEL in the base glyph's coordinate
+space.  The labels are specified as unsigned integers which are registered
+as attachment labels with the font catalog.  A font catalog object
+contains a single local registry of attachment labels which are unique
+across all font resources within the catalog.
+
+The remaining fields of this instruction are interpreted identically
+to those in SET BASE GLYPH.  Like that instruction, this instruction
+may employ extended operands in order to specify a discontiguous range
+of character indexes.
+
+         31     24 23     16 15               00
+         _______________________________________
+        |    |    |         |                   |
+        |1010| NC |  CHIDX  |  GLYPH IDENTIFIER |
+        |____|____|_________|___________________|
+        |                   |                   |
+        |     SRC LABEL     |     DST LABEL     |
+        |___________________|___________________|
+
+
+If either label is not located on the respective glyphs, then a default
+attachment algorithm is to be used.  This algorithm is specified elsewhere.
+Furthermore, if no base glyph has previously been specified in this
+logical glyph stream, then the attaching glyph is to be treated as a
+base glyph, in which case this instruction is treated as if it were
+a SET BASE GLYPH instruction.
+
+4.1.1.9 END OF STREAM (FFh)
+
+Terminate interpretation of logical glyph stream and flush any remaining
+instructions (and operands) in stream.
+
+         31     24 23                         00
+         _______________________________________
+        |         |                             |
+        |   FFh   |            MBZ              |
+        |_________|_____________________________|
+
+
+4.2     GLYPH DRAWING STREAM
+
+5.0     PERFORMANCE

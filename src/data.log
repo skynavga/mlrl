@@ -1,0 +1,83 @@
+This is CTeX, NeXT Version 3.141 (format=plain 93.3.25)  18 AUG 1993 13:45
+**data
+(data.tex
+@firstpass
+[]\tenrm s =0 In olden times when wish-ing still helped 
+@ via @@0 b=0 p=0 d=100
+@@1: line 1.2 t=100 -> @@0
+one, there lived a king whose daugh-ters were all 
+@ via @@1 b=36 p=0 d=2116
+@@2: line 2.1 t=2216 -> @@1
+beau-ti-ful; and the young-est was so beau-ti-ful that 
+@ via @@2 b=5 p=0 d=225
+@@3: line 3.2 t=2441 -> @@2
+the sun it-self, which has seen so much, was aston-
+@\discretionary via @@3 b=0 p=50 d=2600
+@@4: line 4.2- t=5041 -> @@3
+ished when-ever it shone in her face. Close by the 
+@ via @@4 b=2 p=0 d=144
+@@5: line 5.2 t=5185 -> @@4
+king's castle lay a great dark for-est, and un-der an 
+@ via @@5 b=0 p=0 d=100
+@@6: line 6.2 t=5285 -> @@5
+old lime-tree in the for-est was a well, and when 
+@ via @@6 b=51 p=0 d=3721
+@@7: line 7.1 t=9006 -> @@6
+the 
+@ via @@6 b=9 p=0 d=361
+@@8: line 7.2 t=5646 -> @@6
+day was very warm, the king's child went out 
+@ via @@7 b=2 p=0 d=144
+@@9: line 8.2 t=9150 -> @@7
+into 
+@ via @@8 b=0 p=0 d=100
+@@10: line 8.2 t=5746 -> @@8
+the for-est and sat down by the side of the 
+@ via @@9 b=96 p=0 d=11236
+@@11: line 9.1 t=20386 -> @@9
+cool 
+@ via @@9 b=4 p=0 d=196
+@ via @@10 b=86 p=0 d=9216
+@@12: line 9.1 t=14962 -> @@10
+@@13: line 9.2 t=9346 -> @@9
+foun-
+@\discretionary via @@10 b=53 p=50 d=6469
+@@14: line 9.3- t=12215 -> @@10
+ 
+@ via @@10 b=15 p=0 d=625
+@@15: line 9.3 t=6371 -> @@10
+tain; and when she was bored she took 
+@ via @@11 b=7 p=0 d=289
+@@16: line 10.2 t=20675 -> @@11
+a 
+@ via @@11 b=1 p=0 d=121
+@@17: line 10.2 t=20507 -> @@11
+golden 
+@ via @@14 b=23 p=0 d=11089
+@ via @@15 b=23 p=0 d=11089
+@@18: line 10.1 t=17460 -> @@15
+ball, and threw it up on high and caught 
+@ via @@16 b=0 p=0 d=100
+@ via @@17 b=21 p=0 d=961
+@@19: line 11.1 t=21468 -> @@17
+@@20: line 11.2 t=20775 -> @@16
+it; 
+@ via @@16 b=99 p=0 d=11881
+@ via @@17 b=4 p=0 d=196
+@@21: line 11.2 t=20703 -> @@17
+and 
+@ via @@18 b=11 p=0 d=441
+@@22: line 11.2 t=17901 -> @@18
+this 
+@ via @@18 b=82 p=0 d=18464
+@@23: line 11.3 t=35924 -> @@18
+ball was her favor-ite play-thing. 
+@\par via @@19 b=0 p=-10000 d=100
+@\par via @@20 b=0 p=-10000 d=100
+@\par via @@21 b=0 p=-10000 d=100
+@\par via @@22 b=0 p=-10000 d=100
+@\par via @@23 b=0 p=-10000 d=100
+@@24: line 12.2- t=18001 -> @@22
+
+ [1] )
+Output written on data.dvi (1 page, 956 bytes).
